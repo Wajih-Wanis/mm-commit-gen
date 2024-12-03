@@ -1,9 +1,15 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
+const child_process = require('child_process')
 const {Ollama} = require('@langchain/ollama');
-const {ChatOpenAI,AzureChatOpenAI} = require('@lanchain/openai');
+const {ChatOpenAI,AzureChatOpenAI} = require('@langchain/openai');
+const {PromptTemplate} = require('@langchain/core/prompts')
+const MAX_TOKENS = 60000;
 
+const COMMIT_MESSAGE_PROMPT = PromptTemplate.fromTemplate(
+	"You are an expert senior programmer, your task now is to read these changes {changes} made to the repository files and write a descriptive commit message for them"
+);
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 
@@ -35,7 +41,76 @@ function activate(context) {
 }
 
 
+//generates the tracked git changes 
+function generateDiff(repository) {
+	return new Promise((resolve, reject) => {
+	  const folderPath = repository.rootUri.fsPath;
+	  child_process.exec('git diff --cached', { cwd: folderPath }, (error, stdout, stderr) => {
+		if (error) {
+		  console.error(`exec error: ${error}`);
+		  vscode.window.showErrorMessage(`Error generating diff: ${error}`);
+		  reject(error);
+		  return;
+		}
+  
+		const changes = stdout;
+		console.log(`Changes since last commit:\n${changes}`);
+  
+		if (changes.trim().length === 0) {
+		  vscode.window.showInformationMessage('No changes to commit.');
+		  resolve();
+		} else {
+		  vscode.window.withProgress({
+			location: vscode.ProgressLocation.Notification,
+			title: 'Generating commit message...',
+			cancellable: true // Make the progress notification cancellable
+		  }, async (progress, token) => {
+			token.onCancellationRequested(() => {
+			  console.log("User cancelled the long running operation");
+			  reject('Operation cancelled by the user.');
+			});
+  
+			if (estimateTokens(changes) > MAX_TOKENS) {
+			  vscode.window.showErrorMessage(`Error generating commit message: Too many changes to commit. Please commit manually.`);
+			  reject('Error generating commit message: Too many changes to commit. Please commit manually.');
+			  return;
+			}
+  
+			try {
+			  await interpretChanges(changes, 1, progress, repository, token);
+			  progress.report({ message: 'Commit message generated successfully.' });
+			  resolve();
+			} catch (err) {
+			  console.error(err);
+			  reject(err);
+			}
+		  });
+		}
+	  });
+	});
+  }
 
+function estimateTokens(text) {
+	return Math.ceil(text.length / 4);
+}
+
+
+//Interpret the changes
+function interpretChanges(changes,attempt,progress,repository,token){
+	try{
+		if (token.isCancellationRequested){
+			console.log("Operation cancelled by the user");
+			return;
+		}
+		const model = new LocalModel();
+
+		const commit_message = model.run(changes);	
+
+		return commit_message
+	}catch(err){
+		console.log("error occured",err)
+	}
+}
 
 
 //abstract class model to interface model calling 
@@ -57,7 +132,8 @@ class LocalModel extends Model{
 	}
 	async run(input){
 		try{
-			const message = await this.model.invoke(input);
+			let formatted_prompt = await COMMIT_MESSAGE_PROMPT.invoke({changes:input});
+			const message = this.model.invoke(formatted_prompt);
 			return message;
 		}catch(err){
 			console.error("Error in local model invokatio",err)
@@ -80,7 +156,8 @@ class OpenaiModel extends Model{
 
 	async run(input){
 		try{
-			const message = this.model.invoke(input);
+			let formatted_prompt = await COMMIT_MESSAGE_PROMPT.invoke({changes:input});
+			const message = this.model.invoke(formatted_prompt);
 			return message;
 		}catch(err){
 			console.log("error occured",err)
@@ -99,13 +176,14 @@ class AzureOpenaiModel extends Model{
 			azureOpenAIApiKey: api_key,
 			azureOpenAIApiInstanceName: endpoint,
 			azureOpenAIApiVersion:api_version,
-			azureOpenAIDeploymentName:deployment,
+			azureOpenAIApiDeploymentName:deployment,
 		})
 	}
 
 	async run(input){
 		try{
-			const message = await this.model.invoke(input)
+			let formatted_prompt = await COMMIT_MESSAGE_PROMPT.invoke({changes:input});
+			const message = this.model.invoke(formatted_prompt);
 			return message
 		}catch(err){
 			console.log("error occured",err)
