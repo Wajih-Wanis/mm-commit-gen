@@ -3,7 +3,7 @@
   "displayName": "MM Commit Generator",
   "description": "Multimodel commit message generator",
   "version": "0.0.1",
-  "icon": "",
+  "icon": "./images/icon.png",
   "engines": {
     "vscode": "^1.95.0"
   },
