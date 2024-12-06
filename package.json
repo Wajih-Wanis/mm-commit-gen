@@ -1,40 +1,68 @@
 {
   "name": "mm-commit-gen",
-  "displayName": "mm-commit-gen",
-  "description": "multimodel commit message generator",
+  "displayName": "MM Commit Generator",
+  "description": "Multimodel commit message generator",
   "version": "0.0.1",
+  "icon": "",
   "engines": {
     "vscode": "^1.95.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:mm-commit-gen.generate-commit"
+  ],
   "main": "./extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "mm-commit-gen.helloWorld",
-        "title": "Hello World"
+        "command": "mm-commit-gen.generate-commit",
+        "title": "Generate Commit Message"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "MM Commit Generator",
+      "properties": {
+        "mm-commit-gen.ollama.model": {
+          "type": "string",
+          "description": "Ollama model to use for commit message generation",
+          "default": "llama3"
+        },
+        "mm-commit-gen.openai.apiKey": {
+          "type": "string",
+          "description": "OpenAI API key"
+        },
+        "mm-commit-gen.openai.model": {
+          "type": "string",
+          "description": "OpenAI model to use",
+          "default": "gpt-3.5-turbo",
+          "enum": [
+            "gpt-3.5-turbo",
+            "gpt-3.5-turbo-16k",
+            "gpt-4",
+            "gpt-4-turbo",
+            "gpt-4o"
+          ]
+        }
+      }
+    }
   },
   "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
     "lint": "eslint .",
     "pretest": "npm run lint",
     "test": "vscode-test"
   },
-  "devDependencies": {
-    "@types/mocha": "^10.0.9",
-    "@types/node": "20.x",
-    "@types/vscode": "^1.95.0",
-    "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1",
-    "eslint": "^9.13.0"
-  },
   "dependencies": {
-    "@langchain/core": "^0.3.19",
     "@langchain/ollama": "^0.1.2",
     "@langchain/openai": "^0.3.14"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@types/vscode": "^1.95.0",
+    "typescript": "^5.7.2"
   }
 }
