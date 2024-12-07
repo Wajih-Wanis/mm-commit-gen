@@ -1,9 +1,14 @@
 {
   "name": "mm-commit-gen",
   "displayName": "MM Commit Generator",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Wajih-Wanis/mm-commit-gen"
+  },
   "description": "Multimodel commit message generator",
   "version": "0.0.1",
   "icon": "./images/icon.png",
+  "publisher": "WajihW",
   "engines": {
     "vscode": "^1.95.0"
   },

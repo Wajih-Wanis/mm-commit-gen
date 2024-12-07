@@ -1,0 +1,18 @@
+{
+	"compilerOptions": {
+	  "allowJs": true,           // Allow JavaScript files
+	  "checkJs": false,          // Skip type checking for JavaScript files
+	  "outDir": "./out",         // Output directory for compiled files
+	  "target": "esnext",        // Target modern JavaScript
+	  "module": "commonjs",      // Use CommonJS for Node.js
+	  "esModuleInterop": true,   // Enable ES module interop
+	  "skipLibCheck": true       // Skip type checking of libraries
+	},
+	"include": ["./*.js", "./test/**/*.js"], // Include all .js files in root and test folder
+	"exclude": [
+	  "node_modules",            // Exclude dependencies
+	  "./out",                   // Exclude output directory
+	  "*.mjs"                    // Exclude config files
+	]
+  }
+  

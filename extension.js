@@ -11,7 +11,7 @@ const MAX_TOKENS = 60000;
 let isGenerating = false;
 
 const COMMIT_MESSAGE_PROMPT = PromptTemplate.fromTemplate(
-	"You are an expert senior programmer, your task now is to read these changes {changes} made to the repository files and write a descriptive commit message for them, the commit message should as concise as possible and only return the commit message"
+	"You are an expert senior programmer, your task now is to read these changes {changes} made to the repository files and write a descriptive commit message for them, the commit message should as concise as possible. Make sure you only generate the commit message without anything else"
 );
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -21,6 +21,8 @@ const COMMIT_MESSAGE_PROMPT = PromptTemplate.fromTemplate(
  */
 function activate(context) {
     const disposable = vscode.commands.registerCommand('mm-commit-gen.generate-commit', async () => {
+		const settings = vscode.workspace.getConfiguration('mm-commit-gen');
+		console.log("Settings:", settings);
         if (isGenerating) {
             vscode.window.showInformationMessage("Commit message is being generated");
             return;
@@ -29,12 +31,17 @@ function activate(context) {
         try {
             isGenerating = true;
             const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
+			console.log("git extension",gitExtension)
             if (!gitExtension) {
+				console.log("Git extensio is not available")
                 throw new Error('Git extension is not available.');
             }
 
             const repositories = gitExtension.getAPI(1).repositories;
+			console.log("Repositories",repositories)
             for (let repository of repositories) {
+				console.log("repository",repository)
+				console.log("input box",repository.inputBox)
                 await generateCommitMessage(repository);
             }
         } catch (error) {
@@ -102,7 +109,7 @@ function generateDiff(repository) {
   
 		const changes = stdout;
 		console.log(`Changes since last commit:\n${changes}`);
-  
+		console.log("input box for repo",repository.inputBox)
 		if (changes.trim().length === 0) {
 		  vscode.window.showInformationMessage('No changes to commit.');
 		  resolve();
