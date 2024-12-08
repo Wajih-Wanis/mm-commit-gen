@@ -21,30 +21,50 @@ const COMMIT_MESSAGE_PROMPT = PromptTemplate.fromTemplate(
  */
 function activate(context) {
     const disposable = vscode.commands.registerCommand('mm-commit-gen.generate-commit', async () => {
-		const settings = vscode.workspace.getConfiguration('mm-commit-gen');
-		console.log("Settings:", settings);
         if (isGenerating) {
-            vscode.window.showInformationMessage("Commit message is being generated");
+            vscode.window.showInformationMessage("Commit message is already being generated");
             return;
         }
 
         try {
             isGenerating = true;
             const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
-			console.log("git extension",gitExtension)
+            
             if (!gitExtension) {
-				console.log("Git extensio is not available")
                 throw new Error('Git extension is not available.');
             }
 
             const repositories = gitExtension.getAPI(1).repositories;
-			console.log("Repositories",repositories)
+            
+            if (repositories.length === 0) {
+                vscode.window.showInformationMessage('No git repositories found');
+                return;
+            }
+
             for (let repository of repositories) {
-				console.log("repository",repository)
-				console.log("input box",repository.inputBox)
-                await generateCommitMessage(repository);
+                try {
+                    // Attempt to access inputBox to verify it's available
+                    console.log("Repository input box:", repository.inputBox);
+                    
+                    // Set a temporary message
+                    if (repository.inputBox) {
+                        repository.inputBox.value = "Generating commit message...";
+                        vscode.window.showInformationMessage("Commit message generated successfully")
+                    } else {
+                        console.error("Input box is not accessible");
+                        vscode.window.showErrorMessage("Could not access commit message input");
+                        continue;
+                    }
+
+                    // Generate commit message
+                    await generateCommitMessage(repository);
+                } catch (repoError) {
+                    console.error(`Error processing repository: ${repoError}`);
+                    vscode.window.showErrorMessage(`Error in repository: ${repoError.message}`);
+                }
             }
         } catch (error) {
+            console.error(`Error generating commit message: ${error}`);
             vscode.window.showErrorMessage(`Error generating commit message: ${error.message}`);
         } finally {
             isGenerating = false;
@@ -54,13 +74,24 @@ function activate(context) {
     context.subscriptions.push(disposable);
 }
 
-
 async function generateCommitMessage(repository) {
     try {
+        console.log('Starting generateCommitMessage');
+        
         const changes = await generateDiff(repository);
-        if (!changes) return;
+        console.log('Changes detected:', changes);
+        
+        if (!changes) {
+            console.log('No changes found');
+            if (repository.inputBox) {
+                repository.inputBox.value = '';
+            }
+            return;
+        }
 
         const modelType = await selectModelType();
+        console.log('Selected model type:', modelType);
+        
         let model;
 
         switch (modelType) {
@@ -82,17 +113,44 @@ async function generateCommitMessage(repository) {
                 throw new Error('Invalid model type selected');
         }
 
+        console.log('Model initialized:', model);
+
+        // Properly await and extract the commit message
         const commitMessage = await model.run(changes);
         
-        // Update repository input box with generated commit message
-        repository.inputBox.value = commitMessage;
+        console.log('Raw Generated Commit Message:', commitMessage);
+        console.log('Type of commitMessage:', typeof commitMessage);
+
+        // Clean and set the commit message
+        const finalCommitMessage = commitMessage ? 
+            commitMessage.replace(/^"?The commit message would be:\n\n"?|"?$/, '').trim() : 
+            '';
         
-        vscode.window.showInformationMessage('Commit message generated successfully');
+        console.log('Final Commit Message:', finalCommitMessage);
+
+        // Debug repository input box
+        console.log('Repository input box:', repository.inputBox);
+        console.log('Repository input box value before:', repository.inputBox?.value);
+
+        if (repository.inputBox) {
+            repository.inputBox.value = finalCommitMessage;
+            console.log('Repository input box value after:', repository.inputBox.value);
+            console.log('Commit message set in input box');
+            vscode.window.showInformationMessage('Commit message generated successfully');
+        } else {
+            console.error('Repository input box is not accessible');
+            vscode.window.showErrorMessage('Could not set commit message');
+        }
     } catch (error) {
-        vscode.window.showErrorMessage(`Error: ${error.message}`);
+        console.error('Error in generateCommitMessage:', error);
+        console.error('Error stack:', error.stack);
+        vscode.window.showErrorMessage(`Error generating commit message: ${error.message}`);
+        
+        if (repository.inputBox) {
+            repository.inputBox.value = '';
+        }
     }
 }
-
 
 
 //generates the tracked git changes 
@@ -328,7 +386,7 @@ class LocalModel extends Model {
             }
             let formatted_prompt = await COMMIT_MESSAGE_PROMPT.invoke({changes: input});
             const message = await this.model.invoke(formatted_prompt);
-            return message;
+            return message.toString(); // Ensure it returns a string
         } catch (err) {
             console.error(`Error in Ollama model (${this.modelName}) invocation`, err);
             throw err;
@@ -363,7 +421,7 @@ class OpenaiModel extends Model {
             }
             let formatted_prompt = await COMMIT_MESSAGE_PROMPT.invoke({changes: input});
             const message = await this.model.invoke(formatted_prompt);
-            return message.content;
+            return message.content; // Ensure content is extracted
         } catch (err) {
             console.error(`Error in OpenAI model (${this.model?.modelName}) invocation`, err);
             throw err;
@@ -387,14 +445,15 @@ class AzureOpenaiModel extends Model{
 	}
 
 	async run(input){
-		try{
-			let formatted_prompt = await COMMIT_MESSAGE_PROMPT.invoke({changes:input});
-			const message = this.model.invoke(formatted_prompt);
-			return message
-		}catch(err){
-			console.log("error occured",err)
-		}
-	}
+        try {
+            let formatted_prompt = await COMMIT_MESSAGE_PROMPT.invoke({changes:input});
+            const message = await this.model.invoke(formatted_prompt);
+            return message.content; // Await and extract content
+        } catch(err) {
+            console.log("error occurred", err);
+            throw err;
+        }
+    }
 }
 
 
