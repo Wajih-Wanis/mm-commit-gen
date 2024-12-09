@@ -208,20 +208,22 @@ function estimateTokens(text) {
 
 
 //Interpret the changes
-function interpretChanges(changes,attempt,progress,repository,token){
-	try{
-		if (token.isCancellationRequested){
-			console.log("Operation cancelled by the user");
-			return;
-		}
-		const model = new LocalModel();
-
-		const commit_message = model.run(changes);	
-		console.log("commit message",commit_message)
-		return commit_message
-	}catch(err){
-		console.log("error occured",err)
-	}
+async function interpretChanges(changes, attempt, progress, repository, token) {
+    try {
+        if (token.isCancellationRequested) {
+            console.log("Operation cancelled by the user");
+            return null;
+        }
+        const model = new LocalModel();
+        await model.initialize(); // Ensure model is initialized
+        const commit_message = await model.run(changes);
+        console.log("commit message", commit_message);
+        return commit_message;
+    } catch (err) {
+        console.error("Error occurred", err);
+        vscode.window.showErrorMessage(`Failed to generate commit message: ${err.message}`);
+        return null;
+    }
 }
 
 async function selectModelType() {
@@ -290,7 +292,7 @@ async function getOllamaConfig() {
 
 // Retrieve available Ollama models
 async function getAvailableOllamaModels() {
-    try {
+    try {   
         const { exec } = require('child_process');
         return new Promise((resolve, reject) => {
             exec('ollama list', (error, stdout, stderr) => {
